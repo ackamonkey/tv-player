@@ -209,7 +209,7 @@
             cursor: pointer;
         }
         #tvguide {
-            --label-w: 132px;   /* channel column width */
+            --label-w: 150px;   /* channel column width */
             --row-h: 58px;
             --head-h: 34px;
             position: fixed;
@@ -288,7 +288,31 @@
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
         }
+        .tg-ch-name { flex: 1; min-width: 0; }
         .tg-ch.playing { background: #0b3a66; }
+        /* Logo stacked over a small VLC button in the pinned channel column */
+        .tg-ch-side {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+        }
+        .tg-ch-side .ch-logo { width: 40px; height: 26px; }
+        .tg-vlc {
+            width: 40px;
+            box-sizing: border-box;
+            padding: 3px 0;
+            border-radius: 3px;
+            background: #ff8800;
+            color: #fff;
+            font-size: 0.6rem;
+            font-weight: 700;
+            line-height: 1;
+            text-align: center;
+            text-decoration: none;
+        }
+        .tg-vlc:active { background: #e07400; }
         .tg-time {
             position: absolute;
             top: 0;
@@ -380,7 +404,7 @@
             white-space: nowrap;
         }
         @media (min-width: 801px) and (min-height: 501px) {
-            #tvguide { --label-w: 190px; --row-h: 62px; }
+            #tvguide { --label-w: 210px; --row-h: 62px; }
             .tg-ch-name { font-size: 0.85rem; }
         }
 
@@ -667,20 +691,25 @@
                 vlcBtn.style.justifyContent = 'center';
                 vlcBtn.style.padding = '0 15px';
 
-                try {
-                    const urlObj = new URL(channel.url);
-                    const scheme = urlObj.protocol.replace(':', '');
-                    const hostAndPath = urlObj.host + urlObj.pathname + urlObj.search;
-                    vlcBtn.href = `intent://${hostAndPath}#Intent;action=android.intent.action.VIEW;scheme=${scheme};type=video/*;package=org.videolan.vlc;end;`;
-                } catch (e) {
-                    console.error("Invalid URL format:", channel.url);
-                    vlcBtn.href = '#';
-                }
+                vlcBtn.href = vlcHref(channel) || '#';
 
                 container.appendChild(btn);
                 container.appendChild(vlcBtn);
                 guideDiv.appendChild(container);
             });
+        }
+
+        // Android link that opens a channel's stream in the VLC app
+        function vlcHref(channel) {
+            try {
+                const urlObj = new URL(channel.url);
+                const scheme = urlObj.protocol.replace(':', '');
+                const hostAndPath = urlObj.host + urlObj.pathname + urlObj.search;
+                return `intent://${hostAndPath}#Intent;action=android.intent.action.VIEW;scheme=${scheme};type=video/*;package=org.videolan.vlc;end;`;
+            } catch (e) {
+                console.error("Invalid URL format:", channel.url);
+                return null;
+            }
         }
 
         // Search matches the channel name or what's on now
@@ -1029,7 +1058,7 @@
             const t0 = Math.floor((now - SLOT) / SLOT) * SLOT; // start half an hour back
             const lastStop = Math.max(...rows.map(r => r.progs[r.progs.length - 1][1]));
             const t1 = Math.max(t0 + 2 * SLOT, Math.min(Math.ceil(lastStop / SLOT) * SLOT, t0 + 36 * 3600));
-            const lw = parseFloat(getComputedStyle(tvguide).getPropertyValue('--label-w')) || 132;
+            const lw = parseFloat(getComputedStyle(tvguide).getPropertyValue('--label-w')) || 150;
             const width = lw + px(t1 - t0);
             tgGrid.style.width = `${width}px`;
 
@@ -1058,7 +1087,20 @@
                 const ch = el('tg-ch');
                 ch.dataset.row = ri;
                 ch.title = `Watch ${r.channel.name}`;
-                ch.appendChild(makeLogo(r.channel));
+                // Logo with a small VLC button under it, then the name
+                const side = el('tg-ch-side');
+                side.appendChild(makeLogo(r.channel));
+                const href = vlcHref(r.channel);
+                if (href) {
+                    const vlc = document.createElement('a');
+                    vlc.className = 'tg-vlc';
+                    vlc.href = href;
+                    vlc.textContent = 'VLC';
+                    vlc.title = `Open ${r.channel.name} in VLC`;
+                    vlc.setAttribute('aria-label', `Open ${r.channel.name} in VLC`);
+                    side.appendChild(vlc);
+                }
+                ch.appendChild(side);
                 ch.appendChild(el('tg-ch-name', r.channel.name));
                 if (currentChannel && currentChannel.id === r.channel.id) ch.classList.add('playing');
                 row.appendChild(ch);
@@ -1178,6 +1220,7 @@
 
         tgGrid.addEventListener('click', (e) => {
             if (!tg) return;
+            if (e.target.closest('.tg-vlc')) return; // let the VLC link open the app
             const ch = e.target.closest('.tg-ch');
             if (ch && ch.dataset.row !== undefined) {
                 playFromGuide(tg.rows[ch.dataset.row].channel);
