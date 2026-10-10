@@ -12,9 +12,9 @@ import path from 'path'
 const ROOT = process.cwd()
 const EPG_DIR = path.join(ROOT, 'epg')
 const WORK_DIR = path.join(ROOT, 'work')
-const CHANNELS_FILE = path.join(WORK_DIR, 'custom.channels.xml')
+const CHANNELS_DIR = path.join(WORK_DIR, 'channels') // one channel list per site
+const GUIDES_DIR = path.join(WORK_DIR, 'guides')     // one downloaded guide per site
 const IDS_FILE = path.join(WORK_DIR, 'playlist-ids.json')
-const GUIDE_XML = path.join(WORK_DIR, 'guide.xml')
 const GUIDE_JSON = path.join(ROOT, 'guide.json')
 
 // Guide sources to try first when a channel is listed on several sites.
@@ -94,18 +94,23 @@ async function buildChannels() {
     picked.push({ ...candidates[0], xmltv_id: id })
   }
 
-  fs.mkdirSync(WORK_DIR, { recursive: true })
-  const lines = picked.map(c =>
-    `  <channel site="${esc(c.site)}" lang="${esc(c.lang || 'en')}" xmltv_id="${esc(c.xmltv_id)}" site_id="${esc(c.site_id)}">${esc(decode(c.name))}</channel>`
-  )
-  fs.writeFileSync(CHANNELS_FILE,
-    `<?xml version="1.0" encoding="UTF-8"?>\n<channels>\n${lines.join('\n')}\n</channels>\n`)
+  // One file per site, so the Action can download each site separately
+  // and a crash on one site doesn't lose the others
+  fs.rmSync(CHANNELS_DIR, { recursive: true, force: true })
+  fs.mkdirSync(CHANNELS_DIR, { recursive: true })
+  const bySite = new Map()
+  for (const c of picked) push(bySite, c.site, c)
+  for (const [site, list] of bySite) {
+    const lines = list.map(c =>
+      `  <channel site="${esc(c.site)}" lang="${esc(c.lang || 'en')}" xmltv_id="${esc(c.xmltv_id)}" site_id="${esc(c.site_id)}">${esc(decode(c.name))}</channel>`
+    )
+    fs.writeFileSync(path.join(CHANNELS_DIR, `${site}.channels.xml`),
+      `<?xml version="1.0" encoding="UTF-8"?>\n<channels>\n${lines.join('\n')}\n</channels>\n`)
+  }
   fs.writeFileSync(IDS_FILE, JSON.stringify([...ids]))
 
-  const sites = {}
-  for (const c of picked) sites[c.site] = (sites[c.site] || 0) + 1
   console.log(`Channels with a guide source: ${picked.length} of ${ids.size}`)
-  console.log('By site:', sites)
+  console.log('By site:', Object.fromEntries([...bySite].map(([s, l]) => [s, l.length])))
 }
 
 function siteRank(entry) {
@@ -117,31 +122,37 @@ function siteRank(entry) {
 // ---------- Step 2: convert to guide.json ----------
 
 function buildJson() {
-  if (!fs.existsSync(GUIDE_XML)) {
-    console.error('No guide.xml was downloaded; keeping the existing guide.json')
+  const files = listFiles(GUIDES_DIR, '.xml')
+  if (!files.length) {
+    console.error('No guides were downloaded; keeping the existing guide.json')
     return
   }
-  const xml = fs.readFileSync(GUIDE_XML, 'utf8')
   const now = Date.now()
   const channels = {}
   let count = 0
 
-  for (const m of xml.matchAll(/<programme\b([^>]*)>([\s\S]*?)<\/programme>/g)) {
-    const attrs = parseAttrs(m[1])
-    const start = parseXmltvTime(attrs.start)
-    const stop = parseXmltvTime(attrs.stop)
-    if (!attrs.channel || !start || !stop) continue
-    if (stop < now - KEEP_PAST_MS || start > now + KEEP_AHEAD_MS) continue
+  for (const file of files) {
+    let fileCount = 0
+    const xml = fs.readFileSync(file, 'utf8')
+    for (const m of xml.matchAll(/<programme\b([^>]*)>([\s\S]*?)<\/programme>/g)) {
+      const attrs = parseAttrs(m[1])
+      const start = parseXmltvTime(attrs.start)
+      const stop = parseXmltvTime(attrs.stop)
+      if (!attrs.channel || !start || !stop) continue
+      if (stop < now - KEEP_PAST_MS || start > now + KEEP_AHEAD_MS) continue
 
-    const title = decode((m[2].match(/<title\b[^>]*>([\s\S]*?)<\/title>/) || [])[1] || '').trim()
-    if (!title) continue
-    const sub = decode((m[2].match(/<sub-title\b[^>]*>([\s\S]*?)<\/sub-title>/) || [])[1] || '').trim()
+      const title = decode((m[2].match(/<title\b[^>]*>([\s\S]*?)<\/title>/) || [])[1] || '').trim()
+      if (!title) continue
+      const sub = decode((m[2].match(/<sub-title\b[^>]*>([\s\S]*?)<\/sub-title>/) || [])[1] || '').trim()
 
-    // Compact form: [start, stop, title, subtitle?] with times in seconds
-    const row = [Math.floor(start / 1000), Math.floor(stop / 1000), title]
-    if (sub) row.push(sub)
-    ;(channels[attrs.channel] ||= []).push(row)
-    count++
+      // Compact form: [start, stop, title, subtitle?] with times in seconds
+      const row = [Math.floor(start / 1000), Math.floor(stop / 1000), title]
+      if (sub) row.push(sub)
+      ;(channels[decode(attrs.channel)] ||= []).push(row)
+      fileCount++
+    }
+    console.log(`  ${path.basename(file)}: ${fileCount} programmes`)
+    count += fileCount
   }
 
   for (const list of Object.values(channels)) {
