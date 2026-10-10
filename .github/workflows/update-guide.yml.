@@ -1,0 +1,55 @@
+name: Update TV guide
+
+on:
+  schedule:
+    # Every day at 5:17 AM Eastern (09:17 UTC) and again at 5:17 PM
+    - cron: '17 9,21 * * *'
+  workflow_dispatch: # lets you run it by hand from the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-guide
+  cancel-in-progress: false
+
+jobs:
+  guide:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out this repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Get the iptv-org guide grabber
+        run: |
+          git clone --depth 1 https://github.com/iptv-org/epg.git epg
+          cd epg
+          npm install --no-audit --no-fund
+
+      - name: Pick a guide source for each channel
+        run: node scripts/build-guide.mjs channels
+
+      - name: Download listings
+        working-directory: epg
+        run: npm run grab --- --channels=../work/custom.channels.xml --output=../work/guide.xml --days=2 --maxConnections=5 --timeout=15000
+
+      - name: Build guide.json
+        run: node scripts/build-guide.mjs json
+
+      - name: Save guide.json to the repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add guide.json
+          if git diff --cached --quiet; then
+            echo "Guide unchanged"
+          else
+            git commit -m "Update TV guide"
+            git push
+          fi
