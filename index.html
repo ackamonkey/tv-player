@@ -100,16 +100,20 @@
             padding: 10px;
         }
         .channel-btn {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 10px;
             width: 100%;
+            min-width: 0;
             text-align: left;
             background: #2a2a2a;
             color: #e0e0e0;
             border: 1px solid #333;
-            padding: 12px;
+            padding: 10px 12px;
             border-radius: 6px;
             cursor: pointer;
             transition: background 0.2s;
+            font: inherit;
         }
         .channel-btn:hover {
             background: #3a3a3a;
@@ -118,6 +122,61 @@
             background: #0078d7;
             color: white;
             border-color: #005a9e;
+        }
+        /* Channel logo (light chip so dark logos stay visible) */
+        .ch-logo {
+            width: 48px;
+            height: 34px;
+            flex-shrink: 0;
+            border-radius: 4px;
+            background: #f0f0f0;
+            object-fit: contain;
+            padding: 2px;
+            box-sizing: border-box;
+        }
+        .ch-logo.placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #3a3a3a;
+            color: #bbb;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+        .ch-text {
+            flex: 1;
+            min-width: 0;
+        }
+        .ch-name, .ch-now, .ch-next {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .ch-name { font-weight: 600; }
+        .ch-now  { font-size: 0.85rem; color: #d0d0d0; margin-top: 3px; }
+        .ch-next { font-size: 0.78rem; color: #8f8f8f; margin-top: 2px; }
+        .ch-now:empty, .ch-next:empty { display: none; }
+        .ch-progress {
+            height: 3px;
+            margin-top: 5px;
+            background: #444;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .ch-progress > span {
+            display: block;
+            height: 100%;
+            width: 0;
+            background: #4da3ff;
+        }
+        .channel-btn.active .ch-now,
+        .channel-btn.active .ch-next { color: rgba(255, 255, 255, 0.85); }
+        .channel-btn.active .ch-progress { background: rgba(255, 255, 255, 0.3); }
+        .channel-btn.active .ch-progress > span { background: #fff; }
+        #guide-info {
+            font-size: 0.75rem;
+            color: #777;
+            margin-top: 8px;
         }
         #player-container {
             flex-grow: 1;
@@ -162,7 +221,8 @@
                 <option value="https://iptv-org.github.io/iptv/categories/news.m3u">Category: Global News</option>
                 <option value="https://iptv-org.github.io/iptv/categories/sports.m3u">Category: Global Sports</option>
             </select>
-            <input type="text" id="search" placeholder="Search channels..." onkeyup="filterChannels()">
+            <input type="text" id="search" placeholder="Search channels or shows..." oninput="filterChannels()">
+            <div id="guide-info"></div>
         </div>
         <div id="guide">
             <p style="text-align: center; color: #888;">Loading playlist...</p>
@@ -183,6 +243,8 @@
         let allChannels = [];
         let currentChannel = null;   // the channel the user last picked
         let castContext = null;      // set once the Cast SDK loads
+        let guide = { channels: {}, logos: {} }; // TV listings, filled by loadGuide()
+        let renderedRows = [];       // rows on screen, so Now/Next can refresh in place
 
         // Safari exposes this when AirPlay is possible
         const supportsAirPlay = !!window.WebKitPlaybackTargetAvailabilityEvent;
@@ -207,9 +269,18 @@
                 for (let line of lines) {
                     line = line.trim();
                     if (line.startsWith('#EXTINF:')) {
-                        const commaIndex = line.lastIndexOf(',');
+                        // Attributes like tvg-id="ABC.us@East" tvg-logo="..."
+                        const attrs = {};
+                        for (const m of line.matchAll(/([\w-]+)="([^"]*)"/g)) attrs[m[1]] = m[2];
+                        // The name is after the first comma that follows the attributes
+                        const lastQuote = line.lastIndexOf('"');
+                        const commaIndex = line.indexOf(',', lastQuote === -1 ? 0 : lastQuote);
                         const name = commaIndex !== -1 ? line.substring(commaIndex + 1).trim() : 'Unknown';
-                        parsing = { name: name };
+                        parsing = {
+                            name: name || 'Unknown',
+                            id: attrs['tvg-id'] || '',
+                            logo: attrs['tvg-logo'] || ''
+                        };
                     } else if (line && !line.startsWith('#') && parsing) {
                         parsing.url = line;
                         allChannels.push(parsing);
@@ -225,6 +296,11 @@
 
         function renderGuide(channels) {
             guideDiv.innerHTML = '';
+            renderedRows = [];
+            if (!channels.length) {
+                guideDiv.innerHTML = '<p style="text-align: center; color: #888;">No channels match.</p>';
+                return;
+            }
             channels.forEach((channel) => {
                 const container = document.createElement('div');
                 container.style.display = 'flex';
@@ -235,7 +311,28 @@
                 btn.className = 'channel-btn';
                 btn.style.marginBottom = '0';
                 btn.style.flexGrow = '1';
-                btn.textContent = channel.name;
+
+                btn.appendChild(makeLogo(channel));
+
+                const text = document.createElement('div');
+                text.className = 'ch-text';
+                const nameEl = document.createElement('div');
+                nameEl.className = 'ch-name';
+                nameEl.textContent = channel.name;
+                const nowEl = document.createElement('div');
+                nowEl.className = 'ch-now';
+                const barEl = document.createElement('div');
+                barEl.className = 'ch-progress';
+                barEl.appendChild(document.createElement('span'));
+                const nextEl = document.createElement('div');
+                nextEl.className = 'ch-next';
+                text.append(nameEl, nowEl, barEl, nextEl);
+                btn.appendChild(text);
+
+                const row = { channel, nowEl, nextEl, barEl };
+                renderedRows.push(row);
+                updateRow(row);
+
                 if (currentChannel && currentChannel.url === channel.url) {
                     btn.classList.add('active');
                 }
@@ -275,11 +372,118 @@
             });
         }
 
+        // Search matches the channel name or what's on now
         function filterChannels() {
-            const query = document.getElementById('search').value.toLowerCase();
-            const filtered = allChannels.filter(c => c.name.toLowerCase().includes(query));
+            const query = document.getElementById('search').value.trim().toLowerCase();
+            const filtered = !query ? allChannels : allChannels.filter(c => {
+                if (c.name.toLowerCase().includes(query)) return true;
+                const info = nowNext(c);
+                return !!(info && info.now && info.now[2].toLowerCase().includes(query));
+            });
             renderGuide(filtered);
         }
+
+        // ---------- TV guide (Now / Next) ----------
+
+        // guide.json is rebuilt by a GitHub Action. On GitHub Pages, read it from
+        // raw.githubusercontent.com so updates show up without waiting for Pages to redeploy.
+        function guideUrls() {
+            const urls = [];
+            const host = location.hostname;
+            const repo = location.pathname.split('/').filter(Boolean)[0];
+            if (host.endsWith('.github.io') && repo && !repo.endsWith('.html')) {
+                const owner = host.split('.')[0];
+                urls.push(`https://raw.githubusercontent.com/${owner}/${repo}/main/guide.json`);
+            }
+            urls.push('guide.json');
+            return urls;
+        }
+
+        async function loadGuide() {
+            for (const url of guideUrls()) {
+                try {
+                    const res = await fetch(url, { cache: 'no-cache' });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+                    guide = { channels: data.channels || {}, logos: data.logos || {}, updated: data.updated };
+                    const updated = guide.updated ? new Date(guide.updated) : null;
+                    document.getElementById('guide-info').textContent = updated
+                        ? `Guide updated ${updated.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}`
+                        : '';
+                    if (allChannels.length) filterChannels(); // redraw with logos and listings
+                    return;
+                } catch (err) {
+                    console.warn(`Guide not available from ${url}:`, err.message);
+                }
+            }
+        }
+
+        // Returns { now, next } programmes for a channel, or null if there's no listing.
+        // Each programme is [startSeconds, stopSeconds, title, subtitle?]
+        function nowNext(channel) {
+            const list = channel.id && guide.channels[channel.id];
+            if (!list) return null;
+            const t = Date.now() / 1000;
+            const i = list.findIndex(p => p[1] > t); // first programme that hasn't ended
+            if (i === -1) return null;
+            const now = list[i][0] <= t ? list[i] : null;
+            const next = now ? list[i + 1] : list[i];
+            return { now, next };
+        }
+
+        function formatTime(seconds) {
+            return new Date(seconds * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        }
+
+        function updateRow(row) {
+            const info = nowNext(row.channel);
+            const bar = row.barEl.firstChild;
+            if (!info) {
+                row.nowEl.textContent = '';
+                row.nextEl.textContent = '';
+                row.barEl.style.display = 'none';
+                return;
+            }
+            const { now, next } = info;
+            if (now) {
+                row.nowEl.textContent = now[3] ? `${now[2]} · ${now[3]}` : now[2];
+                const pct = ((Date.now() / 1000 - now[0]) / (now[1] - now[0])) * 100;
+                bar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+                row.barEl.style.display = 'block';
+            } else {
+                row.nowEl.textContent = '';
+                row.barEl.style.display = 'none';
+            }
+            row.nextEl.textContent = next ? `Next ${formatTime(next[0])} · ${next[2]}` : '';
+        }
+
+        function makeLogo(channel) {
+            // Try the guide's logo, then the playlist's, then fall back to a letter
+            const sources = [...new Set([channel.id && guide.logos[channel.id], channel.logo].filter(Boolean))];
+            const placeholder = () => {
+                const ph = document.createElement('div');
+                ph.className = 'ch-logo placeholder';
+                ph.textContent = (channel.name.match(/[A-Za-z0-9]/) || ['?'])[0].toUpperCase();
+                return ph;
+            };
+            if (!sources.length) return placeholder();
+            const img = document.createElement('img');
+            img.className = 'ch-logo';
+            img.loading = 'lazy';
+            img.alt = '';
+            img.referrerPolicy = 'no-referrer';
+            let attempt = 0;
+            img.onerror = () => {
+                attempt++;
+                if (attempt < sources.length) img.src = sources[attempt];
+                else img.replaceWith(placeholder());
+            };
+            img.src = sources[0];
+            return img;
+        }
+
+        // Keep Now/Next and progress bars current
+        setInterval(() => renderedRows.forEach(updateRow), 60 * 1000);
 
         // Decide where a picked channel should play
         function selectChannel(channel) {
@@ -355,6 +559,10 @@
 
             const metadata = new chrome.cast.media.GenericMediaMetadata();
             metadata.title = channel.name;
+            const info = nowNext(channel);
+            if (info && info.now) metadata.subtitle = info.now[2];
+            const logo = (channel.id && guide.logos[channel.id]) || channel.logo;
+            if (logo) metadata.images = [new chrome.cast.Image(logo)];
             mediaInfo.metadata = metadata;
 
             const request = new chrome.cast.media.LoadRequest(mediaInfo);
@@ -453,6 +661,9 @@
         }, 4000);
 
         loadPlaylist();
+        loadGuide();
+        // Pick up the twice-daily guide refresh if the page is left open
+        setInterval(loadGuide, 3 * 60 * 60 * 1000);
     </script>
 
     <!-- Google Cast SDK: loaded last so the callback above is already defined -->
