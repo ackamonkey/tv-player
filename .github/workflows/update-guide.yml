@@ -19,10 +19,10 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Check out this repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -35,9 +35,27 @@ jobs:
       - name: Pick a guide source for each channel
         run: node scripts/build-guide.mjs channels
 
-      - name: Download listings
+      - name: Download listings (one site at a time)
         working-directory: epg
-        run: npm run grab --- --channels=../work/custom.channels.xml --output=../work/guide.xml --days=2 --maxConnections=5 --timeout=15000
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          mkdir -p ../work/guides
+          ok=0; failed=""
+          for f in ../work/channels/*.channels.xml; do
+            site=$(basename "$f" .channels.xml)
+            echo "::group::$site"
+            # 15-minute limit per site; a crash or hang only skips that site
+            if timeout 900 npm run grab --- --channels="$f" --output="../work/guides/$site.xml" --days=2 --maxConnections=3 --timeout=15000; then
+              ok=$((ok+1))
+            else
+              failed="$failed $site"
+              rm -f "../work/guides/$site.xml"
+            fi
+            echo "::endgroup::"
+          done
+          echo "Sites downloaded: $ok"
+          if [ -n "$failed" ]; then echo "::warning::Sites that failed:$failed"; fi
 
       - name: Build guide.json
         run: node scripts/build-guide.mjs json
