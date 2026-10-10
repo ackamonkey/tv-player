@@ -194,6 +194,196 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
+        /* ---------- TV Guide grid ---------- */
+        #open-tvguide {
+            display: none; /* shown once listings load */
+            width: 95%;
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #0078d7;
+            background: #0078d7;
+            color: #fff;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        #tvguide {
+            --label-w: 132px;   /* channel column width */
+            --row-h: 58px;
+            --head-h: 34px;
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            background: #141414;
+            display: none;
+            flex-direction: column;
+        }
+        #tvguide.open { display: flex; }
+        #tg-top {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            padding-top: max(10px, env(safe-area-inset-top));
+            background: #1e1e1e;
+            border-bottom: 1px solid #333;
+        }
+        #tg-top h2 { margin: 0; font-size: 1.1rem; flex: 1; }
+        #tg-top button {
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 6px 10px;
+            font: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        #tg-top button.icon-btn { background: none; border: none; padding: 2px; display: flex; }
+        #tg-scroll {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            overscroll-behavior: contain;
+        }
+        #tg-grid { position: relative; }
+        .tg-head, .tg-row {
+            position: relative;
+            height: var(--row-h);
+            border-bottom: 1px solid #2a2a2a;
+        }
+        .tg-head {
+            height: var(--head-h);
+            position: sticky;
+            top: 0;
+            z-index: 4;
+            background: #1b1b1b;
+            border-bottom: 1px solid #3a3a3a;
+        }
+        /* Channel column stays put while you swipe sideways */
+        .tg-ch {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            width: var(--label-w);
+            height: 100%;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 8px;
+            background: #1e1e1e;
+            border-right: 1px solid #3a3a3a;
+            cursor: pointer;
+        }
+        .tg-head .tg-ch { z-index: 5; background: #1b1b1b; cursor: default; font-size: 0.75rem; color: #888; }
+        .tg-ch .ch-logo { width: 40px; height: 28px; }
+        .tg-ch-name {
+            font-size: 0.78rem;
+            font-weight: 600;
+            line-height: 1.2;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        .tg-ch.playing { background: #0b3a66; }
+        .tg-time {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding-left: 6px;
+            font-size: 0.78rem;
+            color: #aaa;
+            border-left: 1px solid #333;
+            box-sizing: border-box;
+            white-space: nowrap;
+        }
+        .tg-prog {
+            position: absolute;
+            top: 3px;
+            bottom: 3px;
+            box-sizing: border-box;
+            padding: 5px 8px;
+            border-radius: 4px;
+            background: #262626;
+            border: 1px solid #333;
+            overflow: clip; /* clips text without breaking the pinned titles */
+            cursor: pointer;
+        }
+        .tg-prog:hover { background: #303030; }
+        .tg-prog.past { opacity: 0.45; }
+        .tg-prog.live { background: #16324f; border-color: #1f4f7f; }
+        .tg-prog.selected { outline: 2px solid #4da3ff; outline-offset: -2px; }
+        /* Keeps a show's title visible when its start is scrolled off to the left */
+        .tg-prog-inner {
+            position: sticky;
+            left: calc(var(--label-w) + 8px);
+            width: fit-content;
+            max-width: 100%;
+        }
+        .tg-prog-title, .tg-prog-time {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tg-prog-title { font-size: 0.82rem; font-weight: 600; }
+        .tg-prog-time { font-size: 0.72rem; color: #9a9a9a; margin-top: 3px; }
+        /* Red "now" line, with a dot where it meets the time header */
+        #tg-now {
+            position: absolute;
+            top: 0;
+            width: 2px;
+            margin-left: -1px;
+            background: #ff3b30;
+            z-index: 1; /* above shows, below the channel column and header */
+            pointer-events: none;
+        }
+        .tg-now-dot {
+            position: absolute;
+            bottom: -5px;
+            width: 10px;
+            height: 10px;
+            margin-left: -5px;
+            border-radius: 50%;
+            background: #ff3b30;
+            z-index: 1;
+            pointer-events: none;
+        }
+        #tg-empty { padding: 40px 20px; text-align: center; color: #888; }
+        /* Details card for a future show */
+        #tg-detail {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            padding-bottom: max(12px, env(safe-area-inset-bottom));
+            background: #1e1e1e;
+            border-top: 1px solid #333;
+        }
+        #tg-detail.show { display: flex; }
+        #tg-detail-text { flex: 1; min-width: 0; }
+        #tg-detail-title { font-weight: 600; }
+        #tg-detail-sub, #tg-detail-when { font-size: 0.82rem; color: #aaa; margin-top: 2px; }
+        #tg-detail-watch {
+            background: #0078d7;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 12px;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        @media (min-width: 801px) and (min-height: 501px) {
+            #tvguide { --label-w: 190px; --row-h: 62px; }
+            .tg-ch-name { font-size: 0.85rem; }
+        }
+
         /* ---------- Phone layout: video first, channel list slides out ---------- */
         #menu-btn, #fs-btn, #close-menu, #backdrop { display: none; }
         .icon-btn svg { width: 24px; height: 24px; fill: currentColor; }
@@ -311,6 +501,7 @@
                 <option value="https://iptv-org.github.io/iptv/categories/sports.m3u">Category: Global Sports</option>
             </select>
             <input type="text" id="search" placeholder="Search channels or shows..." oninput="filterChannels()">
+            <button id="open-tvguide">TV Guide</button>
             <div id="guide-info"></div>
         </div>
         <div id="guide">
@@ -320,6 +511,28 @@
 
     <div id="player-container">
         <video id="video" controls playsinline x-webkit-airplay="allow"></video>
+    </div>
+
+    <!-- Full-screen TV guide grid -->
+    <div id="tvguide" role="dialog" aria-label="TV Guide">
+        <div id="tg-top">
+            <h2>TV Guide</h2>
+            <button id="tg-jump-now">Now</button>
+            <button id="tg-close" class="icon-btn" title="Close guide" aria-label="Close guide">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+        </div>
+        <div id="tg-scroll">
+            <div id="tg-grid"></div>
+        </div>
+        <div id="tg-detail">
+            <div id="tg-detail-text">
+                <div id="tg-detail-title"></div>
+                <div id="tg-detail-sub"></div>
+                <div id="tg-detail-when"></div>
+            </div>
+            <button id="tg-detail-watch">Watch channel</button>
+        </div>
     </div>
 
     <!-- Phone-only controls over the video -->
@@ -509,6 +722,9 @@
                         ? `Guide updated ${updated.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}`
                         : '';
                     if (allChannels.length) filterChannels(); // redraw with logos and listings
+                    document.getElementById('open-tvguide').style.display =
+                        Object.keys(guide.channels).length ? 'block' : 'none';
+                    if (tvguide.classList.contains('open')) { buildTvGuide(); updateTvGuideTime(); }
                     return;
                 } catch (err) {
                     console.warn(`Guide not available from ${url}:`, err.message);
@@ -752,6 +968,243 @@
             airplayBtn.onclick = () => video.webkitShowPlaybackTargetPicker();
         }
 
+        // ---------- TV Guide grid ----------
+
+        const tvguide = document.getElementById('tvguide');
+        const tgScroll = document.getElementById('tg-scroll');
+        const tgGrid = document.getElementById('tg-grid');
+        const tgDetail = document.getElementById('tg-detail');
+        const SLOT = 30 * 60;        // half-hour columns, in seconds
+        const PX_PER_MIN = 5;        // so each half hour is 150px wide
+        let tg = null;               // the grid currently drawn
+        let tgDetailChannel = null;  // channel behind the details card
+
+        function px(seconds) { return (seconds / 60) * PX_PER_MIN; }
+
+        function el(className, text) {
+            const d = document.createElement('div');
+            if (className) d.className = className;
+            if (text !== undefined) d.textContent = text;
+            return d;
+        }
+
+        // "Today", "Tomorrow", or a weekday
+        function dayWord(seconds) {
+            const d = new Date(seconds * 1000);
+            const today = new Date();
+            const tomorrow = new Date(); tomorrow.setDate(today.getDate() + 1);
+            if (d.toDateString() === today.toDateString()) return 'Today';
+            if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+            return d.toLocaleDateString([], { weekday: 'long' });
+        }
+
+        // Channels in the current list that have listings (one row per channel)
+        function guideRows() {
+            const seen = new Set();
+            const rows = [];
+            for (const channel of allChannels) {
+                if (!channel.id || seen.has(channel.id)) continue;
+                const progs = guide.channels[channel.id];
+                if (!progs || !progs.length) continue;
+                seen.add(channel.id);
+                rows.push({ channel, progs });
+            }
+            return rows;
+        }
+
+        function buildTvGuide() {
+            tgGrid.innerHTML = '';
+            tgDetail.classList.remove('show');
+            const rows = guideRows();
+            if (!rows.length) {
+                tg = null;
+                const empty = el('', 'No listings for the channels in this list yet.');
+                empty.id = 'tg-empty';
+                tgGrid.style.width = '';
+                tgGrid.appendChild(empty);
+                return;
+            }
+
+            const now = Date.now() / 1000;
+            const t0 = Math.floor((now - SLOT) / SLOT) * SLOT; // start half an hour back
+            const lastStop = Math.max(...rows.map(r => r.progs[r.progs.length - 1][1]));
+            const t1 = Math.max(t0 + 2 * SLOT, Math.min(Math.ceil(lastStop / SLOT) * SLOT, t0 + 36 * 3600));
+            const lw = parseFloat(getComputedStyle(tvguide).getPropertyValue('--label-w')) || 132;
+            const width = lw + px(t1 - t0);
+            tgGrid.style.width = `${width}px`;
+
+            // Time header
+            const head = el('tg-head');
+            head.style.width = `${width}px`;
+            head.appendChild(el('tg-ch', new Date().toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })));
+            for (let t = t0; t < t1; t += SLOT) {
+                const midnight = new Date(t * 1000).getHours() === 0 && new Date(t * 1000).getMinutes() === 0;
+                const label = midnight ? `${dayWord(t)} ${formatTime(t)}` : formatTime(t);
+                const cell = el('tg-time', label);
+                cell.style.left = `${lw + px(t - t0)}px`;
+                cell.style.width = `${px(SLOT)}px`;
+                head.appendChild(cell);
+            }
+            const dot = el('tg-now-dot');
+            head.appendChild(dot);
+            tgGrid.appendChild(head);
+
+            // One row per channel
+            const frag = document.createDocumentFragment();
+            rows.forEach((r, ri) => {
+                const row = el('tg-row');
+                row.style.width = `${width}px`;
+
+                const ch = el('tg-ch');
+                ch.dataset.row = ri;
+                ch.title = `Watch ${r.channel.name}`;
+                ch.appendChild(makeLogo(r.channel));
+                ch.appendChild(el('tg-ch-name', r.channel.name));
+                if (currentChannel && currentChannel.id === r.channel.id) ch.classList.add('playing');
+                row.appendChild(ch);
+                row.dataset.row = ri;
+                frag.appendChild(row);
+            });
+            tgGrid.appendChild(frag);
+
+            const line = el('');
+            line.id = 'tg-now';
+            tgGrid.appendChild(line);
+
+            // Shows are only drawn for rows near the screen, so the guide opens fast
+            if (tgObserver) tgObserver.disconnect();
+            tgObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    fillTvGuideRow(entry.target);
+                    tgObserver.unobserve(entry.target);
+                });
+            }, { root: tgScroll, rootMargin: '600px 0px' });
+            tgGrid.querySelectorAll('.tg-row').forEach(row => tgObserver.observe(row));
+
+            tg = { t0, t1, lw, rows, dot, line };
+        }
+
+        let tgObserver = null;
+
+        function fillTvGuideRow(row) {
+            if (!tg || row.dataset.filled) return;
+            row.dataset.filled = '1';
+            const ri = +row.dataset.row;
+            const { t0, t1, lw } = tg;
+            const now = Date.now() / 1000;
+            tg.rows[ri].progs.forEach((p, pi) => {
+                if (p[1] <= t0 || p[0] >= t1) return;
+                const start = Math.max(p[0], t0);
+                const stop = Math.min(p[1], t1);
+                const block = el('tg-prog');
+                block.dataset.row = ri;
+                block.dataset.prog = pi;
+                block.style.left = `${lw + px(start - t0) + 1}px`;
+                block.style.width = `${Math.max(px(stop - start) - 2, 4)}px`;
+                if (p[1] <= now) block.classList.add('past');
+                else if (p[0] <= now) block.classList.add('live');
+                const inner = el('tg-prog-inner');
+                inner.appendChild(el('tg-prog-title', (p[0] < t0 ? '‹ ' : '') + p[2]));
+                inner.appendChild(el('tg-prog-time', `${formatTime(p[0])} – ${formatTime(p[1])}`));
+                block.appendChild(inner);
+                block.title = p[3] ? `${p[2]} · ${p[3]}` : p[2];
+                row.appendChild(block);
+            });
+        }
+
+        // Move the red line and mark shows as past / on now
+        function updateTvGuideTime() {
+            if (!tg) return;
+            const now = Date.now() / 1000;
+            const inRange = now >= tg.t0 && now <= tg.t1;
+            const x = `${tg.lw + px(now - tg.t0)}px`;
+            tg.line.style.display = tg.dot.style.display = inRange ? 'block' : 'none';
+            tg.line.style.left = tg.dot.style.left = x;
+            tg.line.style.height = `${tgGrid.offsetHeight}px`;
+            tgGrid.querySelectorAll('.tg-prog').forEach(block => {
+                const p = tg.rows[block.dataset.row].progs[block.dataset.prog];
+                block.classList.toggle('past', p[1] <= now);
+                block.classList.toggle('live', p[0] <= now && p[1] > now);
+            });
+        }
+
+        // Scroll so the red line sits just right of the channel column
+        function scrollTvGuideToNow() {
+            if (!tg) return;
+            tgScroll.scrollLeft = Math.max(0, px(Date.now() / 1000 - tg.t0) - 40);
+        }
+
+        function openTvGuide() {
+            buildTvGuide();
+            tvguide.classList.add('open');
+            requestAnimationFrame(() => {
+                updateTvGuideTime();
+                scrollTvGuideToNow();
+                // Bring the playing channel into view
+                const playing = tgGrid.querySelector('.tg-ch.playing');
+                tgScroll.scrollTop = playing ? Math.max(0, playing.parentElement.offsetTop - 80) : 0;
+            });
+        }
+
+        function closeTvGuide() {
+            tvguide.classList.remove('open');
+            tgDetail.classList.remove('show');
+        }
+
+        function playFromGuide(channel) {
+            closeTvGuide();
+            selectChannel(channel);
+            filterChannels(); // refresh which channel is highlighted in the list
+        }
+
+        function showDetail(block, row, p) {
+            tgGrid.querySelectorAll('.tg-prog.selected').forEach(b => b.classList.remove('selected'));
+            block.classList.add('selected');
+            const now = Date.now() / 1000;
+            let when = `${row.channel.name} · ${dayWord(p[0])} ${formatTime(p[0])} – ${formatTime(p[1])}`;
+            if (p[0] > now) {
+                const mins = Math.round((p[0] - now) / 60);
+                when += mins < 60 ? ` · in ${mins} min` : ` · in ${Math.floor(mins / 60)} hr ${mins % 60} min`;
+            } else if (p[1] <= now) {
+                when += ' · ended';
+            }
+            document.getElementById('tg-detail-title').textContent = p[2];
+            document.getElementById('tg-detail-sub').textContent = p[3] || '';
+            document.getElementById('tg-detail-when').textContent = when;
+            tgDetailChannel = row.channel;
+            tgDetail.classList.add('show');
+        }
+
+        tgGrid.addEventListener('click', (e) => {
+            if (!tg) return;
+            const ch = e.target.closest('.tg-ch');
+            if (ch && ch.dataset.row !== undefined) {
+                playFromGuide(tg.rows[ch.dataset.row].channel);
+                return;
+            }
+            const block = e.target.closest('.tg-prog');
+            if (!block) return;
+            const row = tg.rows[block.dataset.row];
+            const p = row.progs[block.dataset.prog];
+            const now = Date.now() / 1000;
+            if (p[0] <= now && p[1] > now) {
+                playFromGuide(row.channel); // on now: just watch it
+            } else {
+                showDetail(block, row, p);
+            }
+        });
+
+        document.getElementById('open-tvguide').onclick = openTvGuide;
+        document.getElementById('tg-close').onclick = closeTvGuide;
+        document.getElementById('tg-jump-now').onclick = scrollTvGuideToNow;
+        document.getElementById('tg-detail-watch').onclick = () => {
+            if (tgDetailChannel) playFromGuide(tgDetailChannel);
+        };
+        setInterval(() => {
+            if (tvguide.classList.contains('open')) updateTvGuideTime();
+        }, 30 * 1000);
+
         // ---------- Phone layout: slide-out menu, fading buttons, fullscreen ----------
 
         const compactQuery = window.matchMedia('(max-width: 800px), (max-height: 500px)');
@@ -768,7 +1221,9 @@
         document.getElementById('close-menu').onclick = closeMenu;
         document.getElementById('backdrop').onclick = closeMenu;
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeMenu();
+            if (e.key !== 'Escape') return;
+            if (tvguide.classList.contains('open')) closeTvGuide();
+            else closeMenu();
         });
 
         // Start with the list open on phones, since nothing is playing yet
